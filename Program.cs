@@ -1,13 +1,16 @@
-﻿IEnumerable<int> source = new int[] { 1, 2, 3, 4, 5 };
-foreach (int i in Select(source, x => x * 2))
+﻿IEnumerable<int> numbers = new List<int> { 1, 2, 3, 4, 5 };
+foreach (var number in Select(numbers, x => x * 2))
 {
-    Console.WriteLine(i);
+    Console.WriteLine(number);
 }
 
-
-static IEnumerable<TResult> Select<TSource, TResult>(this IEnumerable<TSource> source, Func<TSource, TResult> selector)
+static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
 {
-    foreach (TSource item in source)
+
+    ArgumentNullException.ThrowIfNull(source);
+    ArgumentNullException.ThrowIfNull(selector);
+
+    foreach (var item in source)
     {
         yield return selector(item);
     }
