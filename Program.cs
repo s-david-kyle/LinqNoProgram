@@ -1,8 +1,11 @@
-﻿IEnumerable<int> numbers = new List<int> { 1, 2, 3, 4, 5 };
-foreach (var number in Select(numbers, x => x * 2))
-{
-    Console.WriteLine(number);
-}
+﻿using System.Security.Cryptography;
+
+Console.WriteLine(0);
+IEnumerable<int> e = Select<int, int>(null, x => x * 2);
+Console.WriteLine(1);
+IEnumerator<int> enumerator = e.GetEnumerator();
+Console.WriteLine(2);
+_ = enumerator.MoveNext();
 
 static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
 {
@@ -10,10 +13,16 @@ static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source
     ArgumentNullException.ThrowIfNull(source);
     ArgumentNullException.ThrowIfNull(selector);
 
-    foreach (var item in source)
+    return Impl(source, selector);
+
+    static IEnumerable<TResult> Impl(IEnumerable<TSource> source, Func<TSource, TResult> selector)
     {
-        yield return selector(item);
+        foreach (TSource item in source)
+        {
+            yield return selector(item);
+        }
     }
+
 }
 
 
