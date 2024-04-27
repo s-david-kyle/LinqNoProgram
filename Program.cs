@@ -1,8 +1,10 @@
 ﻿using System.Collections;
+using System.Diagnostics;
 
-IEnumerable<int> source = Enumerable.Range(1, 1000).ToArray();
+IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 Console.WriteLine(Enumerable.Select(source, x => x * 2).Sum());
-Console.WriteLine(Select(source, x => x * 2).Sum());
+Console.WriteLine(SelectCompiler(source, x => x * 2).Sum());
+Console.WriteLine(SelectManual(source, x => x * 2).Sum());
 
 
 
@@ -43,10 +45,14 @@ static IEnumerable<TResult> SelectManual<TSource, TResult>(IEnumerable<TSource> 
 
 }
 
-sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>
+sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>, IEnumerator<TResult>
 {
     private readonly IEnumerable<TSource> _source;
     private readonly Func<TSource, TResult> _selector;
+
+    IEnumerator<TSource>? _enumerator;
+    private int _state = 0;
+    private TResult _current = default!;
 
     public SelectManualEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
     {
@@ -56,52 +62,67 @@ sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>
 
     public IEnumerator<TResult> GetEnumerator()
     {
-        return new Enumerator(_source, _selector);
+        if (_state == 0)
+        {
+            _state = 1;
+            return this;
+        }
+
+        return new SelectManualEnumerable<TSource, TResult>(_source, _selector) { _state = 1 };
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    private sealed class Enumerator : IEnumerator<TResult>
+    IEnumerator IEnumerable.GetEnumerator()
     {
-        private readonly IEnumerable<TSource> _source;
-        private readonly Func<TSource, TResult> _selector;
-        private TResult _current = default!;
-
-        public Enumerator(IEnumerable<TSource> source, Func<TSource, TResult> selector)
-        {
-            _source = source;
-            _selector = selector;
-        }
-
-        public TResult Current => _current;
-
-        object? IEnumerator.Current => Current;
-        public void Dispose()
-        {
-        }
-
-        public bool MoveNext()
-        {
-            IEnumerator<TSource> enumerator = _source.GetEnumerator();
-            try
-            {
-                if (enumerator.MoveNext())
-                {
-                    _current = _selector(enumerator.Current);
-                    \
-                }
-            }
-            finally
-            {
-                enumerator?.Dispose();
-            }
-
-        }
-
-        public void Reset()
-        {
-            throw new NotSupportedException();
-        }
+        return GetEnumerator();
     }
+
+    public TResult Current => _current;
+
+    object? IEnumerator.Current => Current;
+
+    public bool MoveNext()
+    {
+        switch (_state)
+        {
+            case 1:
+                _enumerator = _source.GetEnumerator();
+                _state = 2;
+                goto case 2;
+            case 2:
+                Debug.Assert(_enumerator != null);
+                try
+                {
+                    if (_enumerator.MoveNext())
+                    {
+                        _current = _selector(_enumerator.Current);
+                        return true;
+                    }
+                }
+                catch
+                {
+                    Dispose();
+                    throw;
+                }
+                break;
+        }
+
+        Dispose();
+        return false;
+
+
+
+    }
+
+    public void Dispose()
+    {
+        _enumerator?.Dispose();
+    }
+
+    public void Reset()
+    {
+        _state = -1;
+        throw new NotSupportedException();
+    }
+
 }
 
